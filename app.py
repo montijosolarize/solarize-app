@@ -1,74 +1,40 @@
-import streamlit as st
+from flask import Flask, render_template, request
 import math
 import pandas as pd
 
-# Mostra a logo no topo
-st.image("solarize.png", width=150)  # Você pode ajustar o tamanho conforme necessário
+app = Flask(__name__)
 
-st.title("☀️ Solarize")
-st.write("""
-App para estimativa de:
-- **Inclinação ideal** de placas solares
-- **Número máximo de placas** por área
-- **Potência máxima do sistema (kW)**
-""")
-
-# Entradas principais
-col1, col2 = st.columns(2)
-with col1:
-    lat = st.number_input("Latitude", 
-                          value=-19.9, 
-                          min_value=-90.0, 
-                          max_value=90.0, 
-                          format="%.6f",
-                          help="Valores entre -90° e 90°")
-
-with col2:
-    lon = st.number_input("Longitude", 
-                          value=-43.9, 
-                          min_value=-180.0, 
-                          max_value=180.0, 
-                          format="%.6f",
-                          help="Valores entre -180° e 180°")
-
-area_disponivel = st.number_input("Área disponível (m²)", 
-                                  value=30.0,
-                                  min_value=1.0,
-                                  step=1.0)
-
-# Configurações avançadas
-with st.expander("⚙️ Configurações Avançadas"):
-    tamanho_placa_m2 = st.number_input("Tamanho de cada placa (m²)", 
-                                       value=1.7,
-                                       min_value=0.1)
-    
-    potencia_placa_w = st.number_input("Potência por placa (W)", 
-                                       value=450,
-                                       min_value=10)
-
-# Funções
 def angulo_ideal(latitude):
-    return abs(latitude) * 0.9 + 3.1  # Fórmula adaptada para o Brasil
+    return abs(latitude) * 0.9 + 3.1  # Fórmula adaptada
 
 def placas_possiveis(area_total, area_placa):
     return math.floor(area_total / area_placa)
 
-# Execução
-if st.button("🔍 Calcular"):
-    with st.spinner("Calculando..."):
+@app.route("/", methods=["GET", "POST"])
+def index():
+    resultado = None
+    mapa = None
+
+    if request.method == "POST":
+        lat = float(request.form["lat"])
+        lon = float(request.form["lon"])
+        area_disponivel = float(request.form["area_disponivel"])
+        tamanho_placa_m2 = float(request.form["tamanho_placa_m2"])
+        potencia_placa_w = float(request.form["potencia_placa_w"])
+
         angulo = angulo_ideal(lat)
         num_placas = placas_possiveis(area_disponivel, tamanho_placa_m2)
-        potencia_total_kw = (num_placas * potencia_placa_w) / 1000  # Convertendo para kW
+        potencia_total_kw = (num_placas * potencia_placa_w) / 1000
 
-        # Resultados
-        st.success(f"**Inclinação ideal:** {angulo:.1f}°")
-        st.success(f"**Número de placas:** {num_placas} unidades")
-        st.success(f"**Potência total estimada:** {potencia_total_kw:.2f} kW")
+        resultado = {
+            "angulo": round(angulo, 1),
+            "num_placas": num_placas,
+            "potencia_total_kw": round(potencia_total_kw, 2),
+            "lat": lat,
+            "lon": lon
+        }
 
-        # Mapa
-        st.subheader("📍 Localização no Mapa")
-        df_coordenadas = pd.DataFrame({'lat': [lat], 'lon': [lon]})
-        st.map(df_coordenadas, zoom=16)
+    return render_template("index.html", resultado=resultado)
 
-st.markdown("---")
-st.caption("Desenvolvido por ~Montijo - Fórmulas adaptadas de INPE")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
